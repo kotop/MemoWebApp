@@ -1,0 +1,28 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/notes-manager-frontend/node_modules
+/notes-manager-frontend/node_modules/
+/venv/
+/notes-manager-frontend/.pnp
+/backend/notes/
+/backend/__pycache__
+.pnp.js
+
+# testing
+/notes-manager-frontend/coverage
+
+# production
+/notes-manager-frontend/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
