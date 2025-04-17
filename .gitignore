@@ -2,18 +2,18 @@
 
 # dependencies
 
-/notes-manager-frontend/node_modules/
+/frontend/node_modules/
 /venv/
-/notes-manager-frontend/.pnp
+/frontend/.pnp
 /backend/notes/
 /backend/__pycache__
 .pnp.js
 
 # testing
-/notes-manager-frontend/coverage/
+/frontend/coverage/
 
 # production
-/notes-manager-frontend/build/
+/frontend/build/
 
 # misc
 .DS_Store
