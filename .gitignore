@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/notes-manager-frontend/node_modules
+
 /notes-manager-frontend/node_modules/
 /venv/
 /notes-manager-frontend/.pnp
@@ -10,10 +10,10 @@
 .pnp.js
 
 # testing
-/notes-manager-frontend/coverage
+/notes-manager-frontend/coverage/
 
 # production
-/notes-manager-frontend/build
+/notes-manager-frontend/build/
 
 # misc
 .DS_Store
