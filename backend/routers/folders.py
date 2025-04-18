@@ -4,19 +4,22 @@ import uuid
 
 from backend.models import Folder
 from backend.database import get_db_connection
+from backend.auth import get_current_user, get_user_id
 
 router = APIRouter(prefix="/api/folders", tags=["folders"])
 
 @router.get("")
-async def get_folders():
+async def get_folders(current_user: dict = Depends(get_current_user)):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute("""
         SELECT id, name, parent_id, color, position
         FROM folders
+        WHERE user_id = ?
         ORDER BY position
-    """)
+    """, (user_id,))
     
     folders = [
         {
@@ -34,15 +37,16 @@ async def get_folders():
     return folders
 
 @router.get("/{folder_id}")
-async def get_folder(folder_id: str):
+async def get_folder(folder_id: str, current_user: dict = Depends(get_current_user)):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute("""
         SELECT id, name, parent_id, color, position
         FROM folders
-        WHERE id = ?
-    """, (folder_id,))
+        WHERE id = ? AND user_id = ?
+    """, (folder_id, user_id))
     
     row = cursor.fetchone()
     
@@ -63,7 +67,8 @@ async def get_folder(folder_id: str):
     return folder
 
 @router.post("")
-async def create_folder(folder: Folder):
+async def create_folder(folder: Folder, current_user: dict = Depends(get_current_user)):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -76,17 +81,17 @@ async def create_folder(folder: Folder):
         cursor.execute("""
             SELECT COALESCE(MAX(position), -1) + 1
             FROM folders
-            WHERE parent_id IS ? OR (parent_id IS NULL AND ? IS NULL)
-        """, (folder.parent_id, folder.parent_id))
+            WHERE (parent_id IS ? OR (parent_id IS NULL AND ? IS NULL)) AND user_id = ?
+        """, (folder.parent_id, folder.parent_id, user_id))
         
         next_position = cursor.fetchone()[0]
         folder.position = next_position
         
-        # Создаем папку
+        # Создаем папку с привязкой к пользователю
         cursor.execute("""
-            INSERT INTO folders (id, name, parent_id, color, position)
-            VALUES (?, ?, ?, ?, ?)
-        """, (folder.id, folder.name, folder.parent_id, folder.color, folder.position))
+            INSERT INTO folders (id, name, parent_id, color, position, user_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (folder.id, folder.name, folder.parent_id, folder.color, folder.position, user_id))
         
         conn.commit()
         
@@ -99,13 +104,14 @@ async def create_folder(folder: Folder):
         conn.close()
 
 @router.put("/{folder_id}")
-async def update_folder(folder_id: str, folder: Folder):
+async def update_folder(folder_id: str, folder: Folder, current_user: dict = Depends(get_current_user)):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Проверяем существование папки
-        cursor.execute("SELECT id FROM folders WHERE id = ?", (folder_id,))
+        # Проверяем существование папки и принадлежность пользователю
+        cursor.execute("SELECT id FROM folders WHERE id = ? AND user_id = ?", (folder_id, user_id))
         result = cursor.fetchone()
         
         if not result:
@@ -116,8 +122,8 @@ async def update_folder(folder_id: str, folder: Folder):
         cursor.execute("""
             UPDATE folders
             SET name = ?, parent_id = ?, color = ?, position = ?
-            WHERE id = ?
-        """, (folder.name, folder.parent_id, folder.color, folder.position, folder_id))
+            WHERE id = ? AND user_id = ?
+        """, (folder.name, folder.parent_id, folder.color, folder.position, folder_id, user_id))
         
         conn.commit()
         
@@ -130,13 +136,14 @@ async def update_folder(folder_id: str, folder: Folder):
         conn.close()
 
 @router.delete("/{folder_id}")
-async def delete_folder(folder_id: str):
+async def delete_folder(folder_id: str, current_user: dict = Depends(get_current_user)):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Проверяем существование папки
-        cursor.execute("SELECT parent_id FROM folders WHERE id = ?", (folder_id,))
+        # Проверяем существование папки и принадлежность пользователю
+        cursor.execute("SELECT parent_id FROM folders WHERE id = ? AND user_id = ?", (folder_id, user_id))
         result = cursor.fetchone()
         
         if not result:
@@ -149,18 +156,18 @@ async def delete_folder(folder_id: str):
         cursor.execute("""
             UPDATE folders
             SET parent_id = ?
-            WHERE parent_id = ?
-        """, (parent_id, folder_id))
+            WHERE parent_id = ? AND user_id = ?
+        """, (parent_id, folder_id, user_id))
         
         # Перемещаем файлы к родителю удаляемой папки
         cursor.execute("""
             UPDATE files
             SET folder_id = ?
-            WHERE folder_id = ?
-        """, (parent_id, folder_id))
+            WHERE folder_id = ? AND user_id = ?
+        """, (parent_id, folder_id, user_id))
         
         # Удаляем папку
-        cursor.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+        cursor.execute("DELETE FROM folders WHERE id = ? AND user_id = ?", (folder_id, user_id))
         
         conn.commit()
         
@@ -171,4 +178,3 @@ async def delete_folder(folder_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
-        
