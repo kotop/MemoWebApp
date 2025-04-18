@@ -10,6 +10,9 @@ from backend.models import Note, Tag
 from backend.database import get_db_connection
 from backend.auth import get_current_user, get_user_id
 
+# Импортируем DATABASE_URL и DATA_DIR из database.py
+from ..database import DATABASE_URL, DATA_DIR
+
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 # ВАЖНО: Маршрут для поиска должен быть определен ДО маршрута для получения заметки по ID
@@ -421,3 +424,13 @@ async def delete_note(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+# Находим примерно строчку 150 и заменяем настройку путей
+def save_file_for_user(user_id, file_content, filename, folder_id=None):
+    # Создаем иерархию папок для пользователя, если её нет
+    notes_base_dir = os.path.join(DATA_DIR, "notes")
+    os.makedirs(notes_base_dir, exist_ok=True)
+    user_notes_dir = os.path.join(notes_base_dir, str(user_id))
+    os.makedirs(user_notes_dir, exist_ok=True)
+    
+    # ...existing code...

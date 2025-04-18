@@ -1,0 +1,14 @@
+version: '3'
+services:
+  notes_app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - notes_data:/data
+    environment:
+      - DATABASE_URL=/data/notes.db
+      - PORT=8080
+
+volumes:
+  notes_data:

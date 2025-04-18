@@ -3,13 +3,17 @@ import os
 from sqlite3 import Row
 
 # Путь к файлу базы данных
-DATABASE_URL = "notes.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "data/notes.db")
+DATA_DIR = os.path.dirname(DATABASE_URL)
+
+# Убедитесь, что директория существует
+os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_db_connection(user_id=None):
     """Создает соединение с базой данных"""
     if user_id:
-        # Определяем путь к БД пользователя
-        db_path = os.path.join("databases", f"user_{user_id}.db")
+        # Определяем путь к БД пользователя относительно DATA_DIR
+        db_path = os.path.join(DATA_DIR, "databases", f"user_{user_id}.db")
         
         # Проверяем существование БД и создаем при необходимости
         if not os.path.exists(os.path.dirname(db_path)):

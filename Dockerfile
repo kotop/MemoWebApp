@@ -8,24 +8,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем файл с зависимостями и устанавливаем их
-COPY requirements.txt ./
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем бэкенд и .env-файл
-COPY backend/ ./backend/
-COPY bot.py ./
-COPY server.py ./
-COPY .env ./
+# Создаем директории для данных
+RUN mkdir -p /data /app/notes
+RUN chmod 777 /data /app/notes
 
-# Копируем готовую сборку фронтенда
-COPY frontend/build ./frontend/build
+# Устанавливаем переменные среды
+ENV DATABASE_URL=/data/notes.db
+ENV PORT=8080
 
-# Создаем директории с правами
-RUN mkdir -p notes data && chmod 777 notes data
+COPY . .
 
-# Открываем порт
 EXPOSE 8080
 
-# Запускаем приложение с переменными окружения
 CMD ["python", "server.py"]
