@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 import uuid
 
-from models import Folder
-from database import get_db_connection
+from backend.models import Folder
+from backend.database import get_db_connection
 
 router = APIRouter(prefix="/api/folders", tags=["folders"])
 

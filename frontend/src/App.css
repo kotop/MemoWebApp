@@ -2,6 +2,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  /* Сбрасываем огранчения внутренних отступов для Telegram Mini App */
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 .app-container {
@@ -12,8 +18,16 @@
 
 .sidebar {
   width: 280px;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--tg-theme-hint-color, #ddd);
   overflow-y: auto;
+}
+
+/* Медиа-запрос для адаптации бокового меню к мобильным устройствам */
+@media (max-width: 600px) {
+  .sidebar {
+    width: 100%;
+    border-right: none;
+  }
 }
 
 .main-content {
@@ -38,7 +52,7 @@
 .editor-toolbar {
   display: flex;
   padding: 8px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--tg-theme-hint-color, #ddd);
 }
 
 .editor-content {
@@ -48,7 +62,7 @@
 
 .tags-container {
   padding: 8px;
-  border-top: 1px solid #ddd;
+  border-top: 1px solid var(--tg-theme-hint-color, #ddd);
 }
 
 .tag-badge {
@@ -71,7 +85,7 @@
   top: 16px;
   right: 16px;
   z-index: 10;
-  background: white;
+  background: var(--tg-theme-bg-color, white);
   padding: 8px;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -103,4 +117,33 @@
 .delete-dialog {
   padding: 16px;
   min-width: 400px;
+}
+
+/* Специальные стили для Telegram Mini App */
+body.telegram-app {
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.telegram-app .MuiPaper-root {
+  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+}
+
+.telegram-app .MuiButton-root {
+  background-color: var(--tg-theme-button-color, #2481cc);
+  color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.telegram-app .MuiTextField-root {
+  border-color: var(--tg-theme-hint-color, #ddd);
+}
+
+/* Убираем скроллбары на iOS (в Telegram Web App не нужны) */
+@supports (-webkit-overflow-scrolling: touch) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
 }

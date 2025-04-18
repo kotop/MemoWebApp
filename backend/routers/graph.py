@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 
-from models import GraphData
-from database import get_db_connection
+from backend.models import GraphData
+from backend.database import get_db_connection
 
 router = APIRouter(prefix="/api/graph", tags=["graph"])
 

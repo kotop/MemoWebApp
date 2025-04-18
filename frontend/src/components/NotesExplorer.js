@@ -42,7 +42,8 @@ function NotesExplorer({
   editMode = false,
   setEditMode,
   folderToEdit,
-  setFolderToEdit
+  setFolderToEdit,
+  inTelegram = false
 }) {
   const [expanded, setExpanded] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -624,40 +625,42 @@ function NotesExplorer({
         )}
       </Paper>
 
-      {/* Кнопки создания для мобильной версии - отображаются под строкой поиска */}
-      <Box 
-        sx={{ 
-          p: 1, 
-          display: { xs: 'flex', md: 'none' }, 
-          gap: 1,
-          mb: 2,
-          mx: 1,
-          borderRadius: 1,
-          bgcolor: 'background.paper',
-          boxShadow: 1
-        }}
-      >
-        <IconButton 
-          color="primary" 
-          onClick={() => onCreateNote()}
-          sx={{ flex: 1 }}
+      {/* Кнопки создания для мобильной версии - отображаются под строкой поиска только если НЕ в Telegram */}
+      {!inTelegram && (
+        <Box 
+          sx={{ 
+            p: 1, 
+            display: { xs: 'flex', md: 'none' }, 
+            gap: 1,
+            mb: 2,
+            mx: 1,
+            borderRadius: 1,
+            bgcolor: 'background.paper',
+            boxShadow: 1
+          }}
         >
-          <AddIcon />
-          <Typography variant="body2" sx={{ ml: 1 }}>
-            New Note
-          </Typography>
-        </IconButton>
-        <IconButton 
-          color="primary" 
-          onClick={() => handleCreateFolderInParent(null)}
-          sx={{ flex: 1 }}
-        >
-          <FolderIcon />
-          <Typography variant="body2" sx={{ ml: 1 }}>
-            New Folder
-          </Typography>
-        </IconButton>
-      </Box>
+          <IconButton 
+            color="primary" 
+            onClick={() => onCreateNote()}
+            sx={{ flex: 1 }}
+          >
+            <AddIcon />
+            <Typography variant="body2" sx={{ ml: 1 }}>
+              Новая заметка
+            </Typography>
+          </IconButton>
+          <IconButton 
+            color="primary" 
+            onClick={() => handleCreateFolderInParent(null)}
+            sx={{ flex: 1 }}
+          >
+            <FolderIcon />
+            <Typography variant="body2" sx={{ ml: 1 }}>
+              Новая папка
+            </Typography>
+          </IconButton>
+        </Box>
+      )}
 
       {isSearchMode ? (
         // Показываем результаты поиска

@@ -1,8 +1,11 @@
-import { AppBar, Toolbar, Typography, Button, Tabs, Tab, Box, useMediaQuery, useTheme, IconButton, Menu, MenuItem } from '@mui/material';
+import { 
+  AppBar, Toolbar, Typography, Button, Tabs, Tab, Box, 
+  useMediaQuery, useTheme, IconButton, Menu, MenuItem 
+} from '@mui/material';
 import { Add as AddIcon, Menu as MenuIcon } from '@mui/icons-material';
 import { useState } from 'react';
 
-function AppHeader({ activeTab, setActiveTab, onCreateNote }) {
+function AppHeader({ activeTab, setActiveTab, onCreateNote, inTelegram = false }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -21,12 +24,21 @@ function AppHeader({ activeTab, setActiveTab, onCreateNote }) {
   };
   
   return (
-    <AppBar position="static">
+    <AppBar 
+      position="static" 
+      color="primary"
+      sx={{
+        // Если мы в Telegram, адаптируем стиль под его интерфейс
+        backgroundColor: inTelegram ? 'transparent' : theme.palette.primary.main,
+        boxShadow: inTelegram ? 'none' : undefined,
+        borderBottom: inTelegram ? `1px solid ${theme.palette.divider}` : 'none'
+      }}
+    >
       <Toolbar>
         {isMobile && (
           <>
             <IconButton
-              color="inherit"
+              color={inTelegram ? "primary" : "inherit"}
               edge="start"
               onClick={handleMenuOpen}
             >
@@ -41,25 +53,31 @@ function AppHeader({ activeTab, setActiveTab, onCreateNote }) {
                 selected={activeTab === 'explorer'} 
                 onClick={() => handleTabChange(null, 'explorer')}
               >
-                Explorer
+                Проводник
               </MenuItem>
               <MenuItem 
                 selected={activeTab === 'graph'} 
                 onClick={() => handleTabChange(null, 'graph')}
               >
-                Graph
+                Граф
               </MenuItem>
               <MenuItem 
                 selected={activeTab === 'editor'} 
                 onClick={() => handleTabChange(null, 'editor')}
               >
-                Editor
+                Редактор
               </MenuItem>
             </Menu>
           </>
         )}
       
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            flexGrow: 1,
+            color: inTelegram ? theme.palette.text.primary : 'inherit'
+          }}
+        >
           Notes Manager
         </Typography>
         
@@ -68,22 +86,27 @@ function AppHeader({ activeTab, setActiveTab, onCreateNote }) {
             <Tabs 
               value={activeTab} 
               onChange={handleTabChange}
-              textColor="inherit"
-              indicatorColor="secondary"
+              textColor={inTelegram ? "primary" : "inherit"}
+              indicatorColor={inTelegram ? "primary" : "secondary"}
             >
-              <Tab value="graph" label="Graph" />
-              <Tab value="editor" label="Editor" />
+              <Tab value="explorer" label="Проводник" />
+              <Tab value="graph" label="Граф" />
+              <Tab value="editor" label="Редактор" />
             </Tabs>
           </Box>
         )}
         
-        <Button 
-          color="inherit" 
-          startIcon={<AddIcon />}
-          onClick={() => onCreateNote()}
-        >
-          New Note
-        </Button>
+        {/* Если не в Telegram, показываем кнопку создания заметки
+            В Telegram кнопка создания заметки будет в нижней части экрана */}
+        {!inTelegram && (
+          <Button 
+            color="inherit" 
+            startIcon={<AddIcon />}
+            onClick={() => onCreateNote()}
+          >
+            Новая заметка
+          </Button>
+        )}
       </Toolbar>
     </AppBar>
   );

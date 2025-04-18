@@ -1,19 +1,26 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Optional
+from typing import List, Optional, Dict
 import os
 import uuid
 from datetime import datetime
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from models import Note, Tag
-from database import get_db_connection
+from backend.models import Note, Tag
+from backend.database import get_db_connection
+from backend.auth import get_current_user, get_user_id
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 # ВАЖНО: Маршрут для поиска должен быть определен ДО маршрута для получения заметки по ID
 @router.get("/search", summary="Search notes")
-async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, exact_match: bool = False):
+async def search_notes(
+    query: Optional[str] = None, 
+    tag: Optional[str] = None, 
+    exact_match: bool = False,
+    current_user: Dict = Depends(get_current_user)
+):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -38,9 +45,9 @@ async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, e
                 FROM files
                 JOIN file_tags ON files.id = file_tags.file_id
                 JOIN unique_tags ON file_tags.tag_id = unique_tags.id
-                WHERE unique_tags.tag COLLATE NOCASE = ?
+                WHERE unique_tags.tag COLLATE NOCASE = ? AND files.user_id = ?
                 ORDER BY files.date_added DESC
-            """, (search_tag_name,))
+            """, (search_tag_name, user_id))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -68,9 +75,9 @@ async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, e
                 FROM files
                 JOIN file_tags ON files.id = file_tags.file_id
                 JOIN unique_tags ON file_tags.tag_id = unique_tags.id
-                WHERE unique_tags.tag COLLATE NOCASE = ?
+                WHERE unique_tags.tag COLLATE NOCASE = ? AND files.user_id = ?
                 ORDER BY files.date_added DESC
-            """, (tag,))
+            """, (tag, user_id))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -95,9 +102,9 @@ async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, e
             cursor.execute("""
                 SELECT id, name, date_added, folder_id
                 FROM files
-                WHERE name LIKE ?
+                WHERE name LIKE ? AND user_id = ?
                 ORDER BY date_added DESC
-            """, (f"%{query}%",))
+            """, (f"%{query}%", user_id))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -123,9 +130,9 @@ async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, e
                 FROM files
                 JOIN file_tags ON files.id = file_tags.file_id
                 JOIN unique_tags ON file_tags.tag_id = unique_tags.id
-                WHERE unique_tags.tag LIKE ?
+                WHERE unique_tags.tag LIKE ? AND files.user_id = ?
                 ORDER BY files.date_added DESC
-            """, (f"%{query}%",))
+            """, (f"%{query}%", user_id))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -146,7 +153,7 @@ async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, e
 
             # 3. Поиск по содержимому
             print("Searching by content")
-            cursor.execute("SELECT id, name, path, date_added, folder_id FROM files")
+            cursor.execute("SELECT id, name, path, date_added, folder_id FROM files WHERE user_id = ?", (user_id,))
             for row in cursor.fetchall():
                 file_id, name, path, date_added, folder_id = row
                 if file_id in processed_files:
@@ -184,13 +191,14 @@ async def search_notes(query: Optional[str] = None, tag: Optional[str] = None, e
         conn.close()
 
 @router.get("/{note_id}")
-async def get_note(note_id: str):
+async def get_note(note_id: str, current_user: Dict = Depends(get_current_user)):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Получаем информацию о заметке
-    cursor.execute("SELECT id, name, path, folder_id, date_added FROM files WHERE id = ?", 
-                  (note_id,))
+    # Получаем информацию о заметке с проверкой user_id
+    cursor.execute("SELECT id, name, path, folder_id, date_added FROM files WHERE id = ? AND user_id = ?", 
+                  (note_id, user_id))
     note_data = cursor.fetchone()
     
     if not note_data:
@@ -237,7 +245,11 @@ async def get_note(note_id: str):
     }
 
 @router.post("")
-async def create_note(note: Note):
+async def create_note(
+    note: Note,
+    current_user: Dict = Depends(get_current_user)
+):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -250,17 +262,21 @@ async def create_note(note: Note):
         if not note.date_added:
             note.date_added = datetime.now().isoformat()
         
-        # Создаем файл заметки
-        note_dir = "notes"
-        path = os.path.join(note_dir, f"{note.id}.md")
+        # Создаем иерархию папок для пользователя, если её нет
+        user_notes_dir = os.path.join("notes", str(user_id))
+        if not os.path.exists(user_notes_dir):
+            os.makedirs(user_notes_dir)
+        
+        # Создаем файл заметки в папке пользователя
+        path = os.path.join(user_notes_dir, f"{note.id}.md")
         with open(path, 'w', encoding='utf-8') as f:
             f.write(note.content)
         
-        # Добавляем запись в базу данных
+        # Добавляем запись в базу данных с указанием user_id
         cursor.execute("""
-            INSERT INTO files (id, name, path, date_added, folder_id, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (note.id, note.name, path, note.date_added, note.folder_id, note.parent_id))
+            INSERT INTO files (id, name, path, date_added, folder_id, parent_id, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (note.id, note.name, path, note.date_added, note.folder_id, note.parent_id, user_id))
         
         # Добавляем теги, если они указаны
         if note.tags:
@@ -297,13 +313,18 @@ async def create_note(note: Note):
         conn.close()
 
 @router.put("/{note_id}")
-async def update_note(note_id: str, note: Note):
+async def update_note(
+    note_id: str, 
+    note: Note, 
+    current_user: Dict = Depends(get_current_user)
+):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Проверяем существование заметки
-        cursor.execute("SELECT path FROM files WHERE id = ?", (note_id,))
+        # Проверяем существование заметки и принадлежность текущему пользователю
+        cursor.execute("SELECT path FROM files WHERE id = ? AND user_id = ?", (note_id, user_id))
         result = cursor.fetchone()
         
         if not result:
@@ -320,8 +341,8 @@ async def update_note(note_id: str, note: Note):
         cursor.execute("""
             UPDATE files 
             SET name = ?, folder_id = ?, parent_id = ? 
-            WHERE id = ?
-        """, (note.name, note.folder_id, note.parent_id, note_id))
+            WHERE id = ? AND user_id = ?
+        """, (note.name, note.folder_id, note.parent_id, note_id, user_id))
         
         # Обновляем теги
         if note.tags is not None:
@@ -362,13 +383,17 @@ async def update_note(note_id: str, note: Note):
         conn.close()
 
 @router.delete("/{note_id}")
-async def delete_note(note_id: str):
+async def delete_note(
+    note_id: str,
+    current_user: Dict = Depends(get_current_user)
+):
+    user_id = get_user_id(current_user)
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Проверяем существование заметки
-        cursor.execute("SELECT path FROM files WHERE id = ?", (note_id,))
+        # Проверяем существование заметки и принадлежность текущему пользователю
+        cursor.execute("SELECT path FROM files WHERE id = ? AND user_id = ?", (note_id, user_id))
         result = cursor.fetchone()
         
         if not result:
@@ -385,7 +410,7 @@ async def delete_note(note_id: str):
         cursor.execute("DELETE FROM file_tags WHERE file_id = ?", (note_id,))
         
         # Удаляем запись из базы данных
-        cursor.execute("DELETE FROM files WHERE id = ?", (note_id,))
+        cursor.execute("DELETE FROM files WHERE id = ? AND user_id = ?", (note_id, user_id))
         
         conn.commit()
         

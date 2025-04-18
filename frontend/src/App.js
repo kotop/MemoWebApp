@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Box, Paper, CircularProgress, CssBaseline } from '@mui/material';
+import { Container, Box, Paper, CircularProgress, CssBaseline, Button } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { fetchTreeData, fetchGraphData, createFolderInParent, updateFolder, deleteFolder, deleteNote, fetchNote, updateNote, moveFolder } from './services/api';
+import { 
+  fetchTreeData, fetchGraphData, createFolderInParent, updateFolder, 
+  deleteFolder, deleteNote, fetchNote, updateNote, moveFolder 
+} from './services/api';
+import { 
+  initTelegramApp, getThemeParams, isRunningInTelegram, 
+  getUserId, showNotification, setupMainButton
+} from './services/telegramService';
 import NotesExplorer from './components/NotesExplorer';
 import NoteEditor from './components/NoteEditor';
 import TagsPanel from './components/TagsPanel';
 import GraphView from './components/GraphView';
 import AppHeader from './components/AppHeader';
 import './App.css';
-
-// Создаем тему для приложения
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#85d1ac',
-    },
-  },
-});
+import AddIcon from '@mui/icons-material/Add';
+import FolderIcon from '@mui/icons-material/Folder';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('graph'); // 'graph' или 'editor'
+  const [activeTab, setActiveTab] = useState('explorer'); // Начальная вкладка изменена на explorer
   const [activeNote, setActiveNote] = useState(null);
   const [activeFolder, setActiveFolder] = useState(null);
   const [graphData, setGraphData] = useState(null);
@@ -29,9 +29,25 @@ function App() {
   const [folderParentId, setFolderParentId] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState(null);
+  const [telegramTheme, setTelegramTheme] = useState(null);
+  const [inTelegram, setInTelegram] = useState(false);
   
-  // Загрузка данных дерева при первом рендере
+  // Инициализация Telegram WebApp и загрузка данных
   useEffect(() => {
+    // Попытка инициализации Telegram WebApp
+    const telegramInitialized = initTelegramApp();
+    setInTelegram(telegramInitialized);
+    
+    // Если приложение запущено в Telegram, получаем параметры темы
+    if (telegramInitialized) {
+      const themeParams = getThemeParams();
+      setTelegramTheme(themeParams);
+      
+      // Настраиваем действие для главной кнопки
+      setupMainButton('Создать заметку', () => handleCreateNote());
+    }
+    
+    // Загружаем данные дерева
     fetchTreeData()
       .then(data => {
         setTreeData(data);
@@ -40,6 +56,9 @@ function App() {
       .catch(error => {
         console.error("Error fetching tree data:", error);
         setLoading(false);
+        if (inTelegram) {
+          showNotification("Ошибка загрузки данных");
+        }
       });
   }, []);
   
@@ -49,8 +68,44 @@ function App() {
     
     fetchGraphData(activeFolder)
       .then(data => setGraphData(data))
-      .catch(error => console.error("Error fetching graph data:", error));
+      .catch(error => {
+        console.error("Error fetching graph data:", error);
+        if (inTelegram) {
+          showNotification("Ошибка загрузки графа");
+        }
+      });
   }, [activeFolder, loading]);
+  
+  // Создаем тему на основе параметров Telegram или используем стандартную
+  const theme = React.useMemo(() => {
+    if (telegramTheme) {
+      // Используем цвета из Telegram
+      return createTheme({
+        palette: {
+          primary: {
+            main: telegramTheme.button_color || '#85d1ac',
+          },
+          background: {
+            default: telegramTheme.bg_color || '#ffffff',
+            paper: telegramTheme.secondary_bg_color || '#f5f5f5',
+          },
+          text: {
+            primary: telegramTheme.text_color || '#000000',
+            secondary: telegramTheme.hint_color || '#777777',
+          },
+        },
+      });
+    }
+    
+    // Стандартная тема приложения
+    return createTheme({
+      palette: {
+        primary: {
+          main: '#85d1ac',
+        },
+      },
+    });
+  }, [telegramTheme]);
   
   // Обработчик выбора заметки
   const handleNoteSelect = (noteId) => {
@@ -98,9 +153,17 @@ function App() {
       }
       // Обновляем данные после успешного создания/обновления
       handleUpdateData();
+      
+      if (inTelegram) {
+        showNotification(editMode ? "Папка обновлена" : "Папка создана");
+      }
     } catch (error) {
       console.error("Error saving folder:", error);
-      alert('Не удалось сохранить папку');
+      if (inTelegram) {
+        showNotification("Ошибка при сохранении папки");
+      } else {
+        alert('Не удалось сохранить папку');
+      }
     }
     setShowFolderDialog(false);
     setEditMode(false);
@@ -112,9 +175,17 @@ function App() {
     try {
       await deleteFolder(folderId);
       handleUpdateData();
+      
+      if (inTelegram) {
+        showNotification("Папка удалена");
+      }
     } catch (error) {
       console.error("Error deleting folder:", error);
-      alert('Не удалось удалить папку');
+      if (inTelegram) {
+        showNotification("Ошибка при удалении папки");
+      } else {
+        alert('Не удалось удалить папку');
+      }
     }
   };
 
@@ -128,9 +199,17 @@ function App() {
       if (activeNote === noteId) {
         setActiveNote(null);
       }
+      
+      if (inTelegram) {
+        showNotification("Заметка удалена");
+      }
     } catch (error) {
       console.error("Error deleting note:", error);
-      alert('Не удалось удалить заметку');
+      if (inTelegram) {
+        showNotification("Ошибка при удалении заметки");
+      } else {
+        alert('Не удалось удалить заметку');
+      }
     }
   };
 
@@ -149,9 +228,17 @@ function App() {
       
       // Обновляем UI
       handleUpdateData();
+      
+      if (inTelegram) {
+        showNotification("Заметка перемещена");
+      }
     } catch (error) {
       console.error("Error moving note:", error);
-      alert('Не удалось переместить заметку');
+      if (inTelegram) {
+        showNotification("Ошибка при перемещении заметки");
+      } else {
+        alert('Не удалось переместить заметку');
+      }
     }
   };
   
@@ -161,9 +248,17 @@ function App() {
       await moveFolder(folderId, targetFolderId);
       // Обновляем UI
       handleUpdateData();
+      
+      if (inTelegram) {
+        showNotification("Папка перемещена");
+      }
     } catch (error) {
       console.error("Error moving folder:", error);
-      alert('Не удалось переместить папку');
+      if (inTelegram) {
+        showNotification("Ошибка при перемещении папки");
+      } else {
+        alert('Не удалось переместить папку');
+      }
     }
   };
 
@@ -192,24 +287,16 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box className="app" sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <AppHeader 
           activeTab={activeTab} 
-          setActiveTab={setActiveTab}
-          onCreateNote={handleCreateNote}
+          setActiveTab={setActiveTab} 
+          onCreateNote={() => handleCreateNote()}
+          inTelegram={inTelegram}
         />
         
-        <Box sx={{ 
-          display: 'flex', 
-          flex: 1, 
-          overflow: 'hidden'
-        }}>
-          <Box className="sidebar" sx={{ 
-            width: 280, 
-            borderRight: '1px solid #ddd', 
-            overflowY: 'auto',
-            display: { xs: activeTab === 'explorer' ? 'block' : 'none', md: 'block' } 
-          }}>
+        <Box sx={{ flex: 1, display: 'flex', overflow: 'auto' }}>
+          {activeTab === 'explorer' && (
             <NotesExplorer
               treeData={treeData}
               activeNote={activeNote}
@@ -229,35 +316,57 @@ function App() {
               setEditMode={setEditMode}
               folderToEdit={folderToEdit}
               setFolderToEdit={setFolderToEdit}
+              inTelegram={inTelegram} // Передаем флаг inTelegram
             />
-          </Box>
+          )}
+          {activeTab === 'graph' && (
+            <GraphView
+              graphData={graphData}
+              loading={loading}
+              onNodeClick={handleGraphNodeClick}
+              onResetView={handleResetGraphView}
+            />
+          )}
           
-          <Box className="main-content" sx={{ 
-            flex: 1, 
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-          }}>
-            {activeTab === 'graph' && (
-              <GraphView
-                graphData={graphData}
-                loading={loading}
-                onNodeClick={handleGraphNodeClick}
-                onResetView={handleResetGraphView}
-              />
-            )}
-            
-            {activeTab === 'editor' && (
-              <NoteEditor
-                noteId={activeNote}
-                folderId={activeFolder}
-                onSave={handleUpdateData}
-                onDelete={handleDeleteNote}  // Передаем функцию удаления
-                treeData={treeData}
-              />
-            )}
-          </Box>
+          {activeTab === 'editor' && (
+            <NoteEditor
+              noteId={activeNote}
+              folderId={activeFolder}
+              onSave={handleUpdateData}
+              onDelete={handleDeleteNote}
+              treeData={treeData}
+              inTelegram={inTelegram}
+              telegramTheme={telegramTheme}
+            />
+          )}
         </Box>
+        
+        {/* Добавляем кнопки внизу экрана для Telegram - меняем на две кнопки */}
+        {inTelegram && (
+          <Box sx={{ 
+            p: 1, 
+            display: 'flex', 
+            borderTop: '1px solid #ddd',
+            backgroundColor: theme.palette.background.paper
+          }}>
+            <Button 
+              startIcon={<AddIcon />} 
+              variant="contained" 
+              onClick={() => handleCreateNote()}
+              sx={{ flex: 1, mr: 1 }}
+            >
+              Новая заметка
+            </Button>
+            <Button 
+              startIcon={<FolderIcon />} 
+              variant="outlined" 
+              onClick={() => handleCreateFolder()}
+              sx={{ flex: 1 }}
+            >
+              Новая папка
+            </Button>
+          </Box>
+        )}
       </Box>
     </ThemeProvider>
   );

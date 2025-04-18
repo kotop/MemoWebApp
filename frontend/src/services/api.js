@@ -1,12 +1,30 @@
 import axios from 'axios';
 
-// Create an axios instance with default config
+// Создаем экземпляр axios с базовым URL
 const api = axios.create({
-  baseURL: '/api',  // Using the proxy in development
-  timeout: 10000,
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json'
   }
+});
+
+// Добавляем перехватчик запросов для автоматического добавления токена авторизации
+api.interceptors.request.use(config => {
+  // Получаем initData из localStorage
+  const initData = localStorage.getItem('tg_init_data');
+  
+  console.log('initData available:', !!initData); // Для отладки
+  
+  if (initData) {
+    config.headers['Authorization'] = `Bearer ${initData}`;
+  } else {
+    // Добавляем тестовый заголовок для разработки
+    config.headers['X-Dev-Mode'] = 'true';
+  }
+  
+  return config;
+}, error => {
+  return Promise.reject(error);
 });
 
 // Error handler
