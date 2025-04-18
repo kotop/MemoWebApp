@@ -9,6 +9,9 @@ services:
     environment:
       - DATABASE_URL=/data/notes.db
       - PORT=8080
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    env_file:
+      - .env
 
 volumes:
   notes_data:

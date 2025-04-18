@@ -15,7 +15,10 @@ DEV_USER = {"id": "12345", "username": "dev_user", "first_name": "Developer"}
 security = HTTPBearer(auto_error=not DEV_MODE)
 
 # Используем токен из .env через переменные окружения
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8056577366:AAETl5dS6wLtzxWcY2dv8EWZTtxU_w6lvxM")
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+if not BOT_TOKEN and not DEV_MODE:
+    raise ValueError("Необходимо установить переменную окружения TELEGRAM_BOT_TOKEN")
 
 def verify_telegram_data(init_data: str) -> Dict:
     """Проверка подлинности данных от Telegram WebApp"""
