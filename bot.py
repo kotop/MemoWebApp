@@ -433,9 +433,10 @@ async def run_bot():
         application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        # Запуск бота без ожидания - просто инициализация
+        # Запуск бота в режиме polling - ИЗМЕНЕНО!
         await application.initialize()
         await application.start()
+        await application.updater.start_polling()
         
         logger.info(f"Telegram бот успешно запущен, режим разработки: {DEV_MODE}")
         return application
