@@ -31,3 +31,4 @@ yarn-error.log*
 /db_data/
 .env
 build-script.shbuild-script.sh
+build-script.sh
