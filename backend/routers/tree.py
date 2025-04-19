@@ -8,17 +8,16 @@ router = APIRouter(prefix="/api/tree", tags=["tree"])
 async def get_tree(current_user: dict = Depends(get_current_user)):
     """Получение структуры файлов и папок для проводника"""
     user_id = get_user_id(current_user)
-    conn = get_db_connection()
+    conn = get_db_connection(user_id)  # Используем пользовательскую БД
     cursor = conn.cursor()
     
     try:
-        # Получаем все папки текущего пользователя
+        # Получаем все папки пользователя
         cursor.execute("""
             SELECT id, name, parent_id, color, position
             FROM folders
-            WHERE user_id = ?
             ORDER BY position
-        """, (user_id,))
+        """)
         
         folders = [
             {
@@ -31,13 +30,12 @@ async def get_tree(current_user: dict = Depends(get_current_user)):
             for row in cursor.fetchall()
         ]
         
-        # Получаем все файлы текущего пользователя
+        # Получаем все файлы пользователя
         cursor.execute("""
             SELECT id, name, folder_id, parent_id, path
             FROM files
-            WHERE user_id = ?
             ORDER BY name
-        """, (user_id,))
+        """)
         
         files = [
             {

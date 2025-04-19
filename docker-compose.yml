@@ -8,10 +8,19 @@ services:
       - notes_data:/data
     environment:
       - DATABASE_URL=/data/notes.db
+      - DATA_DIR=/data
       - PORT=8080
+      - DEV_MODE=False
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - WEBAPP_URL=${WEBAPP_URL}
+      - PYTHONUNBUFFERED=1  # Добавьте эту строку для вывода логов без буферизации
     env_file:
       - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   notes_data:

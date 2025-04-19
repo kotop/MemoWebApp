@@ -15,10 +15,12 @@ CONTAINER_NAME="notes-manager-tg"
 IMAGE_NAME="notes-manager-tg"
 PORT="8080"
 TELEGRAM_BOT_TOKEN="8056577366:AAETl5dS6wLtzxWcY2dv8EWZTtxU_w6lvxM"
-WEBAPP_URL="https://ef3f-83-243-121-157.ngrok-free.app"
+WEBAPP_URL="https://your-domain.com"
 DATABASE_URL="/data/notes.db"
 DATA_DIR="$(pwd)/data"
-NOTES_DIR="$(pwd)/notes"
+NOTES_DIR="$(pwd)/data/notes"
+USERS_DIR="$(pwd)/data/users"
+DEV_MODE="False"
 
 # Функция для вывода сообщений
 log() {
@@ -83,6 +85,8 @@ mkdir -p "$DATA_DIR"
 check_result "Ошибка создания директории данных" "Директория данных готова"
 mkdir -p "$NOTES_DIR"
 check_result "Ошибка создания директории для заметок" "Директория для заметок готова"
+mkdir -p "$USERS_DIR"
+check_result "Ошибка создания директории для пользовательских баз данных" "Директория для пользовательских баз данных готова"
 
 # Шаг 5: Запуск Docker-контейнера
 log "Шаг 5: Запуск Docker-контейнера"
@@ -93,8 +97,9 @@ docker run -d \
   -e WEBAPP_URL=$WEBAPP_URL \
   -e PORT=$PORT \
   -e DATABASE_URL=$DATABASE_URL \
+  -e DATA_DIR=/data \
+  -e DEV_MODE=$DEV_MODE \
   -v "$DATA_DIR:/data" \
-  -v "$NOTES_DIR:/app/notes" \
   $IMAGE_NAME
 
 check_result "Ошибка запуска Docker-контейнера" "Docker-контейнер успешно запущен"
@@ -115,6 +120,7 @@ if docker ps | grep -q $CONTAINER_NAME; then
     echo -e "${GREEN}==============================================${NC}"
     echo -e "URL приложения: ${YELLOW}$WEBAPP_URL${NC}"
     echo -e "Порт: ${YELLOW}$PORT${NC}"
+    echo -e "Мультипользовательский режим: ${YELLOW}$([ "$DEV_MODE" == "False" ] && echo "Включен" || echo "Отключен")${NC}"
     echo -e "\nДля просмотра логов используйте: ${YELLOW}docker logs $CONTAINER_NAME${NC}"
     echo -e "Для остановки контейнера: ${YELLOW}docker stop $CONTAINER_NAME${NC}"
     echo -e "Для перезапуска контейнера: ${YELLOW}docker restart $CONTAINER_NAME${NC}"

@@ -43,7 +43,8 @@ function NotesExplorer({
   setEditMode,
   folderToEdit,
   setFolderToEdit,
-  inTelegram = false
+  inTelegram = false,
+  fullWidth = false // Добавляем новый параметр для управления шириной
 }) {
   const [expanded, setExpanded] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -597,7 +598,16 @@ function NotesExplorer({
   const rootFiles = treeData.files.filter(file => !file.folder_id);
   
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      width: '100%', // Всегда используем полную ширину
+      minWidth: '100%', // Минимальная ширина также 100%
+      maxWidth: '100%', // Максимальная ширина также 100%
+      boxSizing: 'border-box', // Учитываем padding и border внутри width
+      overflow: 'hidden' // Предотвращаем выход за пределы контейнера
+    }}>
       <Paper
         component="form"
         sx={{ 
@@ -605,7 +615,9 @@ function NotesExplorer({
           display: 'flex', 
           alignItems: 'center', 
           m: 1,
-          mb: 2
+          mb: 2,
+          width: 'calc(100% - 16px)', // Учитываем отступы по бокам
+          boxSizing: 'border-box'
         }}
       >
         <InputBase

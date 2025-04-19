@@ -15,11 +15,17 @@ export const initTelegramApp = () => {
     // Добавляем токен аутентификации в localStorage
     localStorage.setItem('tg_init_data', window.tg.initData);
     
+    // Устанавливаем тему для CSS
+    document.body.classList.add('telegram-app');
+    
     // Настраиваем цвета и элементы интерфейса
     window.tg.expand();
     window.tg.ready();
+    
+    console.log("Telegram WebApp initialized successfully");
     return true;
   }
+  console.warn("Telegram WebApp not available, running in standalone mode");
   return false;
 };
 
@@ -34,6 +40,14 @@ export const getUserInfo = () => {
 export const getUserId = () => {
   const user = getUserInfo();
   return user?.id || null;
+};
+
+// Получение имени пользователя Telegram
+export const getUserName = () => {
+  const user = getUserInfo();
+  if (!user) return null;
+  
+  return user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim();
 };
 
 // Показать всплывающее уведомление в Telegram
@@ -93,11 +107,14 @@ export const isRunningInTelegram = () => {
   return !!telegram;
 };
 
-// Получение начальных данных (если переданы через бота)
+// Получение начальных данных (initData) для авторизации на API
 export const getInitData = () => {
-  if (!telegram) return null;
+  if (telegram) {
+    return telegram.initData;
+  }
   
-  return telegram.initData;
+  // Пытаемся получить из localStorage, если телеграм недоступен
+  return localStorage.getItem('tg_init_data') || null;
 };
 
 // Обработка кнопки "назад" (если поддерживается)
@@ -113,4 +130,47 @@ export const hideBackButton = () => {
   if (!telegram || !telegram.BackButton) return;
   
   telegram.BackButton.hide();
+};
+
+// Отправляет данные в Telegram бота (например, о созданной заметке)
+export const sendDataToBot = async (action, data = {}) => {
+  if (!telegram) return false;
+  
+  try {
+    // Формируем данные для отправки
+    const payload = {
+      user_id: getUserId(),
+      action: action,
+      data: data
+    };
+    
+    // Отправляем данные боту через WebView
+    telegram.sendData(JSON.stringify(payload));
+    return true;
+  } catch (error) {
+    console.error("Error sending data to Telegram bot:", error);
+    return false;
+  }
+};
+
+// Функция для валидации данных initData
+export const validateInitData = async () => {
+  const initData = getInitData();
+  if (!initData) return false;
+  
+  try {
+    const response = await fetch('/api/telegram/validate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data: initData })
+    });
+    
+    const result = await response.json();
+    return result.success;
+  } catch (error) {
+    console.error("Error validating Telegram data:", error);
+    return false;
+  }
 };

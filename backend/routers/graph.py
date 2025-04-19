@@ -1,14 +1,20 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 
 from backend.models import GraphData
 from backend.database import get_db_connection
+from backend.auth import get_current_user, get_user_id
 
 router = APIRouter(prefix="/api/graph", tags=["graph"])
 
 @router.get("")
-async def get_graph(folder_id: Optional[str] = None, tag: Optional[str] = None):
-    conn = get_db_connection()
+async def get_graph(
+    folder_id: Optional[str] = None, 
+    tag: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = get_user_id(current_user)
+    conn = get_db_connection(user_id)  # Используем пользовательскую БД
     cursor = conn.cursor()
     
     try:
@@ -80,26 +86,27 @@ async def get_graph(folder_id: Optional[str] = None, tag: Optional[str] = None):
                 })
             
             # Получаем связи родитель-потомок
-            cursor.execute(f"""
-                SELECT f1.id as source, f2.id as target
-                FROM files f1
-                JOIN files f2 ON f1.id = f2.parent_id
-                WHERE f1.id IN ({placeholders}) AND f2.id IN ({placeholders})
-            """, file_ids + file_ids)
+            if len(file_ids) > 1:  # Проверяем, что есть достаточно файлов для связей
+                cursor.execute(f"""
+                    SELECT f1.id as source, f2.id as target
+                    FROM files f1
+                    JOIN files f2 ON f1.id = f2.parent_id
+                    WHERE f1.id IN ({placeholders}) AND f2.id IN ({placeholders})
+                """, file_ids + file_ids)
+                
+                parent_edges = [
+                    {
+                        "source": row[0],
+                        "target": row[1],
+                        "relation": "parent",
+                        "color": "#000000"
+                    }
+                    for row in cursor.fetchall()
+                ]
+                
+                edges.extend(parent_edges)
             
-            parent_edges = [
-                {
-                    "source": row[0],
-                    "target": row[1],
-                    "relation": "parent",
-                    "color": "#000000"
-                }
-                for row in cursor.fetchall()
-            ]
-            
-            edges.extend(parent_edges)
-            
-            # ИЗМЕНЕНО: Получаем теги и даты добавления для файлов вместо создания связей напрямую
+            # Получаем теги и даты добавления для файлов
             cursor.execute(f"""
                 SELECT files.id, unique_tags.tag, unique_tags.color, files.date_added
                 FROM files

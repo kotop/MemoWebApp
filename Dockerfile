@@ -12,12 +12,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Создаем директории для данных
-RUN mkdir -p /data /app/notes
-RUN chmod 777 /data /app/notes
+RUN mkdir -p /data /data/notes /data/users /app/notes
+RUN chmod 777 /data /data/notes /data/users /app/notes
 
 # Устанавливаем переменные среды
 ENV DATABASE_URL=/data/notes.db
+ENV DATA_DIR=/data
 ENV PORT=8080
+ENV DEV_MODE=False
 
 COPY . .
 

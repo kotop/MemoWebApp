@@ -18,6 +18,39 @@ import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 
 function App() {
+
+  // Добавить в начало функции App
+  useEffect(() => {
+    // Отладка данных Telegram
+    if (window.Telegram?.WebApp) {
+      const initData = window.Telegram.WebApp.initData;
+      console.log("Telegram initData available:", !!initData);
+      console.log("Telegram initData length:", initData?.length);
+      console.log("Telegram user:", window.Telegram.WebApp.initDataUnsafe?.user);
+      
+      // Проверка отправки данных в API
+      const testAuth = async () => {
+        try {
+          const response = await fetch('/api/auth/test', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${initData}`
+            }
+          });
+          const data = await response.json();
+          console.log("Auth test result:", data);
+        } catch (error) {
+          console.error("Auth test error:", error);
+        }
+      };
+      
+      testAuth();
+    } else {
+      console.warn("Telegram WebApp API not available!");
+    }
+  }, []);
+
+
   const [activeTab, setActiveTab] = useState('explorer'); // Начальная вкладка - explorer
   const [prevTab, setPrevTab] = useState('explorer'); // Для запоминания предыдущей вкладки
   const [activeNote, setActiveNote] = useState(null);

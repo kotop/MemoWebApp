@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getInitData } from './telegramService';
 
 // Создаем экземпляр axios с базовым URL
 const api = axios.create({
@@ -10,16 +11,13 @@ const api = axios.create({
 
 // Добавляем перехватчик запросов для автоматического добавления токена авторизации
 api.interceptors.request.use(config => {
-  // Получаем initData из localStorage
-  const initData = localStorage.getItem('tg_init_data');
-  
-  console.log('initData available:', !!initData); // Для отладки
+  // Получаем initData из Telegram или localStorage
+  const initData = getInitData();
   
   if (initData) {
     config.headers['Authorization'] = `Bearer ${initData}`;
   } else {
-    // Добавляем тестовый заголовок для разработки
-    config.headers['X-Dev-Mode'] = 'true';
+    console.warn('No Telegram initData available for authorization');
   }
   
   return config;
@@ -35,6 +33,13 @@ const handleError = (error) => {
     // that falls out of the range of 2xx
     console.error('Response data:', error.response.data);
     console.error('Response status:', error.response.status);
+    
+    // Специальная обработка ошибок авторизации
+    if (error.response.status === 401) {
+      console.error('Authorization error. User is not authenticated.');
+      // Можно добавить перенаправление или уведомление пользователя
+    }
+    
     return Promise.reject(error.response.data || 'Error processing request');
   } else if (error.request) {
     // The request was made but no response was received

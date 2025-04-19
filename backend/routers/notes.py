@@ -3,17 +3,19 @@ from typing import List, Optional, Dict
 import os
 import uuid
 from datetime import datetime
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
 
 from backend.models import Note, Tag
 from backend.database import get_db_connection
 from backend.auth import get_current_user, get_user_id
 
-# Импортируем DATABASE_URL и DATA_DIR из database.py
-from ..database import DATABASE_URL, DATA_DIR
-
 router = APIRouter(prefix="/api/notes", tags=["notes"])
+
+# Функция для получения пути к заметкам пользователя
+def get_user_notes_dir(user_id):
+    base_notes_dir = os.path.join(os.environ.get("DATA_DIR", "data"), "notes")
+    user_notes_dir = os.path.join(base_notes_dir, str(user_id))
+    os.makedirs(user_notes_dir, exist_ok=True)
+    return user_notes_dir
 
 # ВАЖНО: Маршрут для поиска должен быть определен ДО маршрута для получения заметки по ID
 @router.get("/search", summary="Search notes")
@@ -24,7 +26,7 @@ async def search_notes(
     current_user: Dict = Depends(get_current_user)
 ):
     user_id = get_user_id(current_user)
-    conn = get_db_connection()
+    conn = get_db_connection(user_id)  # Используем БД пользователя
     cursor = conn.cursor()
     
     # Добавим логирование для отладки
@@ -48,9 +50,9 @@ async def search_notes(
                 FROM files
                 JOIN file_tags ON files.id = file_tags.file_id
                 JOIN unique_tags ON file_tags.tag_id = unique_tags.id
-                WHERE unique_tags.tag COLLATE NOCASE = ? AND files.user_id = ?
+                WHERE unique_tags.tag COLLATE NOCASE = ?
                 ORDER BY files.date_added DESC
-            """, (search_tag_name, user_id))
+            """, (search_tag_name,))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -78,9 +80,9 @@ async def search_notes(
                 FROM files
                 JOIN file_tags ON files.id = file_tags.file_id
                 JOIN unique_tags ON file_tags.tag_id = unique_tags.id
-                WHERE unique_tags.tag COLLATE NOCASE = ? AND files.user_id = ?
+                WHERE unique_tags.tag COLLATE NOCASE = ?
                 ORDER BY files.date_added DESC
-            """, (tag, user_id))
+            """, (tag,))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -105,9 +107,9 @@ async def search_notes(
             cursor.execute("""
                 SELECT id, name, date_added, folder_id
                 FROM files
-                WHERE name LIKE ? AND user_id = ?
+                WHERE name LIKE ?
                 ORDER BY date_added DESC
-            """, (f"%{query}%", user_id))
+            """, (f"%{query}%",))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -133,9 +135,9 @@ async def search_notes(
                 FROM files
                 JOIN file_tags ON files.id = file_tags.file_id
                 JOIN unique_tags ON file_tags.tag_id = unique_tags.id
-                WHERE unique_tags.tag LIKE ? AND files.user_id = ?
+                WHERE unique_tags.tag LIKE ?
                 ORDER BY files.date_added DESC
-            """, (f"%{query}%", user_id))
+            """, (f"%{query}%",))
             
             for row in cursor.fetchall():
                 file_id, name, date_added, folder_id = row
@@ -156,7 +158,7 @@ async def search_notes(
 
             # 3. Поиск по содержимому
             print("Searching by content")
-            cursor.execute("SELECT id, name, path, date_added, folder_id FROM files WHERE user_id = ?", (user_id,))
+            cursor.execute("SELECT id, name, path, date_added, folder_id FROM files")
             for row in cursor.fetchall():
                 file_id, name, path, date_added, folder_id = row
                 if file_id in processed_files:
@@ -196,12 +198,11 @@ async def search_notes(
 @router.get("/{note_id}")
 async def get_note(note_id: str, current_user: Dict = Depends(get_current_user)):
     user_id = get_user_id(current_user)
-    conn = get_db_connection()
+    conn = get_db_connection(user_id)  # Используем БД пользователя
     cursor = conn.cursor()
     
-    # Получаем информацию о заметке с проверкой user_id
-    cursor.execute("SELECT id, name, path, folder_id, date_added FROM files WHERE id = ? AND user_id = ?", 
-                  (note_id, user_id))
+    # Получаем информацию о заметке
+    cursor.execute("SELECT id, name, path, folder_id, date_added FROM files WHERE id = ?", (note_id,))
     note_data = cursor.fetchone()
     
     if not note_data:
@@ -217,8 +218,8 @@ async def get_note(note_id: str, current_user: Dict = Depends(get_current_user))
             content = f.read()
     else:
         # Если файл не существует, создаем пустой
-        note_dir = "notes"
-        path = os.path.join(note_dir, f"{note_id}.md")
+        user_notes_dir = get_user_notes_dir(user_id)
+        path = os.path.join(user_notes_dir, f"{note_id}.md")
         with open(path, 'w', encoding='utf-8') as f:
             pass
         
@@ -253,7 +254,7 @@ async def create_note(
     current_user: Dict = Depends(get_current_user)
 ):
     user_id = get_user_id(current_user)
-    conn = get_db_connection()
+    conn = get_db_connection(user_id)  # Используем БД пользователя
     cursor = conn.cursor()
     
     try:
@@ -265,21 +266,19 @@ async def create_note(
         if not note.date_added:
             note.date_added = datetime.now().isoformat()
         
-        # Создаем иерархию папок для пользователя, если её нет
-        user_notes_dir = os.path.join("notes", str(user_id))
-        if not os.path.exists(user_notes_dir):
-            os.makedirs(user_notes_dir)
+        # Создаем директорию для заметок пользователя
+        user_notes_dir = get_user_notes_dir(user_id)
         
-        # Создаем файл заметки в папке пользователя
+        # Создаем файл заметки
         path = os.path.join(user_notes_dir, f"{note.id}.md")
         with open(path, 'w', encoding='utf-8') as f:
             f.write(note.content)
         
-        # Добавляем запись в базу данных с указанием user_id
+        # Добавляем запись в базу данных
         cursor.execute("""
-            INSERT INTO files (id, name, path, date_added, folder_id, parent_id, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (note.id, note.name, path, note.date_added, note.folder_id, note.parent_id, user_id))
+            INSERT INTO files (id, name, path, date_added, folder_id, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (note.id, note.name, path, note.date_added, note.folder_id, note.parent_id))
         
         # Добавляем теги, если они указаны
         if note.tags:
@@ -322,12 +321,12 @@ async def update_note(
     current_user: Dict = Depends(get_current_user)
 ):
     user_id = get_user_id(current_user)
-    conn = get_db_connection()
+    conn = get_db_connection(user_id)  # Используем БД пользователя
     cursor = conn.cursor()
     
     try:
-        # Проверяем существование заметки и принадлежность текущему пользователю
-        cursor.execute("SELECT path FROM files WHERE id = ? AND user_id = ?", (note_id, user_id))
+        # Проверяем существование заметки
+        cursor.execute("SELECT path FROM files WHERE id = ?", (note_id,))
         result = cursor.fetchone()
         
         if not result:
@@ -344,8 +343,8 @@ async def update_note(
         cursor.execute("""
             UPDATE files 
             SET name = ?, folder_id = ?, parent_id = ? 
-            WHERE id = ? AND user_id = ?
-        """, (note.name, note.folder_id, note.parent_id, note_id, user_id))
+            WHERE id = ?
+        """, (note.name, note.folder_id, note.parent_id, note_id))
         
         # Обновляем теги
         if note.tags is not None:
@@ -391,12 +390,12 @@ async def delete_note(
     current_user: Dict = Depends(get_current_user)
 ):
     user_id = get_user_id(current_user)
-    conn = get_db_connection()
+    conn = get_db_connection(user_id)  # Используем БД пользователя
     cursor = conn.cursor()
     
     try:
-        # Проверяем существование заметки и принадлежность текущему пользователю
-        cursor.execute("SELECT path FROM files WHERE id = ? AND user_id = ?", (note_id, user_id))
+        # Проверяем существование заметки
+        cursor.execute("SELECT path FROM files WHERE id = ?", (note_id,))
         result = cursor.fetchone()
         
         if not result:
@@ -413,7 +412,7 @@ async def delete_note(
         cursor.execute("DELETE FROM file_tags WHERE file_id = ?", (note_id,))
         
         # Удаляем запись из базы данных
-        cursor.execute("DELETE FROM files WHERE id = ? AND user_id = ?", (note_id, user_id))
+        cursor.execute("DELETE FROM files WHERE id = ?", (note_id,))
         
         conn.commit()
         
@@ -424,13 +423,3 @@ async def delete_note(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
-
-# Находим примерно строчку 150 и заменяем настройку путей
-def save_file_for_user(user_id, file_content, filename, folder_id=None):
-    # Создаем иерархию папок для пользователя, если её нет
-    notes_base_dir = os.path.join(DATA_DIR, "notes")
-    os.makedirs(notes_base_dir, exist_ok=True)
-    user_notes_dir = os.path.join(notes_base_dir, str(user_id))
-    os.makedirs(user_notes_dir, exist_ok=True)
-    
-    # ...existing code...

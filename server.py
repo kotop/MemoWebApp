@@ -19,6 +19,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Задаем режим разработки через переменную окружения
+DEV_MODE = os.environ.get("DEV_MODE", "False").lower() == "true"
+
 # Инициализируем базу данных
 init_db()
 
@@ -40,8 +43,8 @@ app.include_router(folders.router)
 app.include_router(graph.router)
 app.include_router(tree.router)
 
+# Подключаем статические файлы React-приложения
 app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
-
 
 # Перенаправление корневого URL на React-приложение
 @app.get("/")
@@ -54,14 +57,22 @@ app.mount("/app", StaticFiles(directory="frontend/build", html=True), name="app"
 # Проверка состояния API
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "message": "API is running"}
+    return {
+        "status": "ok", 
+        "message": "API is running",
+        "mode": "development" if DEV_MODE else "production",
+        "version": "1.0.0"
+    }
 
 async def start_bot():
     """Запускает Telegram бота в отдельной задаче."""
     try:
         # Запускаем бота в отдельном потоке
-        bot_updater = run_bot()
-        logger.info("Telegram bot started successfully")
+        bot_updater = await run_bot()
+        if bot_updater:
+            logger.info("Telegram bot started successfully")
+        else:
+            logger.warning("Telegram bot initialization failed")
     except Exception as e:
         logger.error(f"Failed to start Telegram bot: {e}")
 
@@ -79,6 +90,12 @@ async def start_server():
 async def main():
     """Основная функция для запуска всех компонентов."""
     try:
+        # Выводим информацию о режиме работы
+        if DEV_MODE:
+            logger.info("Starting in DEVELOPMENT mode (single user mode)")
+        else:
+            logger.info("Starting in PRODUCTION mode (multi-user mode)")
+        
         # Запускаем бота как отдельную задачу
         bot_task = asyncio.create_task(start_bot())
         
