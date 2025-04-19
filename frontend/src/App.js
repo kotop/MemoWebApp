@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Box, Paper, CircularProgress, CssBaseline, Button } from '@mui/material';
+import { Box, CircularProgress, CssBaseline, Button } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { 
   fetchTreeData, fetchGraphData, createFolderInParent, updateFolder, 
@@ -7,11 +7,10 @@ import {
 } from './services/api';
 import { 
   initTelegramApp, getThemeParams, isRunningInTelegram, 
-  getUserId, showNotification, setupMainButton
+  getUserId, showNotification, hideMainButton 
 } from './services/telegramService';
 import NotesExplorer from './components/NotesExplorer';
 import NoteEditor from './components/NoteEditor';
-import TagsPanel from './components/TagsPanel';
 import GraphView from './components/GraphView';
 import AppHeader from './components/AppHeader';
 import './App.css';
@@ -19,7 +18,8 @@ import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('explorer'); // Начальная вкладка изменена на explorer
+  const [activeTab, setActiveTab] = useState('explorer'); // Начальная вкладка - explorer
+  const [prevTab, setPrevTab] = useState('explorer'); // Для запоминания предыдущей вкладки
   const [activeNote, setActiveNote] = useState(null);
   const [activeFolder, setActiveFolder] = useState(null);
   const [graphData, setGraphData] = useState(null);
@@ -43,8 +43,8 @@ function App() {
       const themeParams = getThemeParams();
       setTelegramTheme(themeParams);
       
-      // Настраиваем действие для главной кнопки
-      setupMainButton('Создать заметку', () => handleCreateNote());
+      // Скрываем главную кнопку при запуске приложения
+      hideMainButton();
     }
     
     // Загружаем данные дерева
@@ -74,7 +74,7 @@ function App() {
           showNotification("Ошибка загрузки графа");
         }
       });
-  }, [activeFolder, loading]);
+  }, [activeFolder, loading, inTelegram]);
   
   // Создаем тему на основе параметров Telegram или используем стандартную
   const theme = React.useMemo(() => {
@@ -107,8 +107,9 @@ function App() {
     });
   }, [telegramTheme]);
   
-  // Обработчик выбора заметки
+  // Обработчик выбора заметки - сохраняем предыдущую вкладку перед переключением на редактор
   const handleNoteSelect = (noteId) => {
+    setPrevTab(activeTab); // Сохраняем текущую вкладку (explorer или graph)
     setActiveNote(noteId);
     setActiveTab('editor');
   };
@@ -120,17 +121,24 @@ function App() {
   
   // Обработчик клика по узлу графа
   const handleGraphNodeClick = (nodeId) => {
+    setPrevTab('graph'); // Запоминаем, что мы пришли из графа
     setActiveNote(nodeId);
     setActiveTab('editor');
   };
   
   // Обработчик создания новой заметки
   const handleCreateNote = (folderId = null) => {
+    setPrevTab(activeTab); // Сохраняем текущую вкладку
     setActiveNote('new');
     setActiveTab('editor');
     if (folderId) {
       setActiveFolder(folderId);
     }
+  };
+
+  // Функция для обработки возврата из редактора
+  const handleBackFromEditor = () => {
+    setActiveTab(prevTab); // Возвращаемся к предыдущей вкладке (explorer или graph)
   };
   
   // Обработчик создания новой папки
@@ -195,9 +203,10 @@ function App() {
       await deleteNote(noteId);
       // Обновляем дерево и граф после удаления
       handleUpdateData();
-      // Если удаленная заметка была активной, сбрасываем активную заметку
+      // Если удаленная заметка была активной, сбрасываем активную заметку и возвращаемся к предыдущей вкладке
       if (activeNote === noteId) {
         setActiveNote(null);
+        setActiveTab(prevTab);
       }
       
       if (inTelegram) {
@@ -288,12 +297,15 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <AppHeader 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          onCreateNote={() => handleCreateNote()}
-          inTelegram={inTelegram}
-        />
+        {/* Показываем заголовок только когда не в режиме редактора */}
+        {activeTab !== 'editor' && (
+          <AppHeader 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            onCreateNote={() => handleCreateNote()}
+            inTelegram={inTelegram}
+          />
+        )}
         
         <Box sx={{ flex: 1, display: 'flex', overflow: 'auto' }}>
           {activeTab === 'explorer' && (
@@ -316,7 +328,7 @@ function App() {
               setEditMode={setEditMode}
               folderToEdit={folderToEdit}
               setFolderToEdit={setFolderToEdit}
-              inTelegram={inTelegram} // Передаем флаг inTelegram
+              inTelegram={inTelegram}
             />
           )}
           {activeTab === 'graph' && (
@@ -337,12 +349,13 @@ function App() {
               treeData={treeData}
               inTelegram={inTelegram}
               telegramTheme={telegramTheme}
+              onBack={handleBackFromEditor} // Добавлен обработчик возврата
             />
           )}
         </Box>
         
-        {/* Добавляем кнопки внизу экрана для Telegram - меняем на две кнопки */}
-        {inTelegram && (
+        {/* Добавляем кнопки внизу экрана для Telegram */}
+        {inTelegram && activeTab !== 'editor' && (
           <Box sx={{ 
             p: 1, 
             display: 'flex', 

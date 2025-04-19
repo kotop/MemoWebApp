@@ -61,12 +61,6 @@ function AppHeader({ activeTab, setActiveTab, onCreateNote, inTelegram = false }
               >
                 Граф
               </MenuItem>
-              <MenuItem 
-                selected={activeTab === 'editor'} 
-                onClick={() => handleTabChange(null, 'editor')}
-              >
-                Редактор
-              </MenuItem>
             </Menu>
           </>
         )}
@@ -84,14 +78,13 @@ function AppHeader({ activeTab, setActiveTab, onCreateNote, inTelegram = false }
         {!isMobile && (
           <Box sx={{ mr: 2 }}>
             <Tabs 
-              value={activeTab} 
+              value={activeTab}
               onChange={handleTabChange}
               textColor={inTelegram ? "primary" : "inherit"}
               indicatorColor={inTelegram ? "primary" : "secondary"}
             >
               <Tab value="explorer" label="Проводник" />
               <Tab value="graph" label="Граф" />
-              <Tab value="editor" label="Редактор" />
             </Tabs>
           </Box>
         )}

@@ -19,13 +19,14 @@ import {
   Title as TitleIcon,
   Link as LinkIcon,
   Image as ImageIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import MarkdownPreview from './MarkdownPreview';
 import TagsPanel from './TagsPanel';
 import { fetchNote, createNote, updateNote } from '../services/api';
 
-function NoteEditor({ noteId, folderId, onSave, onDelete, treeData }) {
+function NoteEditor({ noteId, folderId, onSave, onDelete, treeData, inTelegram, telegramTheme, onBack }) {
   const [note, setNote] = useState({
     id: null,
     name: 'Untitled Note',
@@ -176,6 +177,18 @@ function NoteEditor({ noteId, folderId, onSave, onDelete, treeData }) {
     }
     handleCloseDeleteDialog();
   };
+
+  // Функция для возврата к предыдущему экрану
+  const handleBack = () => {
+    // Если есть несохраненные изменения, спрашиваем пользователя
+    if (isModified) {
+      if (window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите покинуть редактор?')) {
+        if (onBack) onBack();
+      }
+    } else {
+      if (onBack) onBack();
+    }
+  };
   
   if (loading && !note.content) {
     return (
@@ -193,6 +206,14 @@ function NoteEditor({ noteId, folderId, onSave, onDelete, treeData }) {
         display: 'flex', 
         alignItems: 'center' 
       }}>
+        {/* Кнопка "Назад" */}
+        <IconButton 
+          onClick={handleBack}
+          sx={{ mr: 1 }}
+        >
+          <ArrowBackIcon />
+        </IconButton>
+
         <input
           type="text"
           value={note.name}

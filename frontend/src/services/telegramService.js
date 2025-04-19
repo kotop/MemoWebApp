@@ -67,6 +67,13 @@ export const setupMainButton = (text, onClick) => {
   telegram.MainButton.show();
 };
 
+// Скрытие главной кнопки
+export const hideMainButton = () => {
+  if (!telegram || !telegram.MainButton) return;
+  
+  telegram.MainButton.hide();
+};
+
 // Закрытие приложения
 export const closeApp = () => {
   if (!telegram) return;
